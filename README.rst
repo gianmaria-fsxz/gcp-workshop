@@ -2,17 +2,10 @@
 GCP - Workshop - Vertex Pipeline
 ==================================
 
-launch step
+create venv
+python -m venv gcpvenv
+pip install -r requirements.txt
+Configure the env.sh and the launch.sh file with proper paths
+./launch.sh prediction
 
-- activate the virtual environment \ 
-source /home/jupyter/vertex_venv/bin/activate
-
-- loading the envoronment variables \
-source env.sh
-
-- compile the pipeline \
-rm $PIPELINE_FILE
-python -m pipelines.models.price_imputer.training.pipeline
-
-- trigger the pipeline\
-python sandbox_trigger.py
+Go check on vertex!
