@@ -1,0 +1,20 @@
+{
+    "attributes": { 
+        "enable_caching": "False",
+        "template_path": "training.json"
+    },
+    "data": {
+        "project_id": "sandbox-mvp-001",
+        "project_location": "europe-west1",
+        "pipeline_files_gcs_path": "gs://my-sandbox-bucket/pipelines/my-unique-namespace",
+        "ingestion_project_id": "my-sandbox-gcp-project",
+        "model_name": "model-change-device",
+        "model_label": "label_name",
+        "tfdv_schema_filename": "tfdv_schema_training.pbtxt",
+        "tfdv_train_stats_path": "gs://my-sandbox-bucket/train_stats/my-unique-namespace/train.stats", 
+        "dataset_id": "preprocessing",
+        "dataset_location": "EU",
+        "input_file_path": "chicago_taxi_trips",
+        "timestamp": "2021-08-01 00:00:00"
+    }
+}

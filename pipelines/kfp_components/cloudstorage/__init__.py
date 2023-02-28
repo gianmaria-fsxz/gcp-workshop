@@ -1,0 +1,1 @@
+from pipelines.kfp_components.cloudstorage.read_gcs import read_gcs

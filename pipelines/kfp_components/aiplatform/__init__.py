@@ -1,0 +1,4 @@
+# from pipelines.kfp_components.aiplatform.deploy import deploy
+from pipelines.kfp_components.aiplatform.upload_model import upload_model
+from pipelines.kfp_components.aiplatform.lookup_model import lookup_model
+from pipelines.kfp_components.aiplatform.batch_predictop import batch_predictop
