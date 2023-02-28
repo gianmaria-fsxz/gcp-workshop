@@ -1,0 +1,369 @@
+{
+  "pipelineSpec": {
+    "components": {
+      "comp-endpoint-predict": {
+        "executorLabel": "exec-endpoint-predict",
+        "inputDefinitions": {
+          "artifacts": {
+            "input_data": {
+              "artifactType": {
+                "schemaTitle": "system.Dataset",
+                "schemaVersion": "0.0.1"
+              }
+            }
+          },
+          "parameters": {
+            "dataset_id": {
+              "type": "STRING"
+            },
+            "endpoint_id": {
+              "type": "STRING"
+            },
+            "project_id": {
+              "type": "STRING"
+            },
+            "project_location": {
+              "type": "STRING"
+            },
+            "table_id": {
+              "type": "STRING"
+            }
+          }
+        }
+      },
+      "comp-preprocess": {
+        "executorLabel": "exec-preprocess",
+        "inputDefinitions": {
+          "artifacts": {
+            "dataset_raw": {
+              "artifactType": {
+                "schemaTitle": "system.Dataset",
+                "schemaVersion": "0.0.1"
+              }
+            }
+          }
+        },
+        "outputDefinitions": {
+          "artifacts": {
+            "dataset_processed": {
+              "artifactType": {
+                "schemaTitle": "system.Dataset",
+                "schemaVersion": "0.0.1"
+              }
+            }
+          }
+        }
+      },
+      "comp-read-table": {
+        "executorLabel": "exec-read-table",
+        "inputDefinitions": {
+          "parameters": {
+            "dataset_id": {
+              "type": "STRING"
+            },
+            "project_id": {
+              "type": "STRING"
+            },
+            "table_id": {
+              "type": "STRING"
+            }
+          }
+        },
+        "outputDefinitions": {
+          "artifacts": {
+            "dataset": {
+              "artifactType": {
+                "schemaTitle": "system.Dataset",
+                "schemaVersion": "0.0.1"
+              }
+            }
+          }
+        }
+      },
+      "comp-transfer-to-bq": {
+        "executorLabel": "exec-transfer-to-bq",
+        "inputDefinitions": {
+          "parameters": {
+            "dataset": {
+              "type": "STRING"
+            },
+            "project": {
+              "type": "STRING"
+            },
+            "table": {
+              "type": "STRING"
+            },
+            "uri": {
+              "type": "STRING"
+            }
+          }
+        }
+      }
+    },
+    "deploymentSpec": {
+      "executors": {
+        "exec-endpoint-predict": {
+          "container": {
+            "args": [
+              "--executor_input",
+              "{{$}}",
+              "--function_to_execute",
+              "endpoint_predict"
+            ],
+            "command": [
+              "sh",
+              "-c",
+              "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip || python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1 python3 -m pip install --quiet     --no-warn-script-location 'google-cloud-aiplatform==1.21.0' 'google-cloud-storage==1.42.2' 'pandas_gbq==0.19.1' 'scikit-learn==0.24.1' 'kfp==1.8.18' && \"$0\" \"$@\"\n",
+              "sh",
+              "-ec",
+              "program_path=$(mktemp -d)\nprintf \"%s\" \"$0\" > \"$program_path/ephemeral_component.py\"\npython3 -m kfp.v2.components.executor_main                         --component_module_path                         \"$program_path/ephemeral_component.py\"                         \"$@\"\n",
+              "\nimport kfp\nfrom kfp.v2 import dsl\nfrom kfp.v2.dsl import *\nfrom typing import *\n\ndef endpoint_predict(\n    endpoint_id: str,\n    input_data: Input[Dataset],\n    project_location: str,\n    project_id: str,\n    dataset_id: str,\n    table_id: str\n):\n    \"\"\"\n    Fetch a model given a model name (display name) and export to GCS.\n\n    Args:\n        endpoint_id (str): Required. The endpoint id\n        input_data (Input[Dataset]): Data to predict.\n        project_location (str): location of the Google Cloud project\n        project_id (str): project id of the Google Cloud project\n        dataset_id (str): bq dataset to write predictions\n        table_id (str): table to write predictions\n\n    Returns:\n        str: Resource name of the exported model.\n    \"\"\"\n\n    import logging\n    from google.cloud import aiplatform\n    import pandas as pd\n    import pandas_gbq\n\n    logging.info(f\"Retrieving model endpoint in project_id = {project_id} and project_location = {project_location}...\")\n\n    endpoint = aiplatform.Endpoint(\n            endpoint_name=endpoint_id,\n            project=project_id,\n            location=project_location)\n\n    # logging.info(\"retrieved following endpoints...\", endpoint.gca_resource)\n\n    df_test = pd.read_csv(input_data.path+\".csv\")\n\n    # logging.info(f\"Test dataset read.\")\n\n    instances = df_test.to_dict(orient='records')\n    predictions = endpoint.predict(instances)\n    df_test['prediction'] = pd.DataFrame(predictions.predictions)['predicted_TARGET_FLAG']\n\n    pandas_gbq.to_gbq(df_test, f\"{dataset_id}.{table_id}\", project_id=project_id)\n\n"
+            ],
+            "image": "python:3.7"
+          }
+        },
+        "exec-preprocess": {
+          "container": {
+            "args": [
+              "--executor_input",
+              "{{$}}",
+              "--function_to_execute",
+              "preprocess"
+            ],
+            "command": [
+              "sh",
+              "-c",
+              "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip || python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1 python3 -m pip install --quiet     --no-warn-script-location 'pandas==1.3.5' 'scikit-learn==0.24.1' 'pyarrow==9.0.0' 'kfp==1.8.18' && \"$0\" \"$@\"\n",
+              "sh",
+              "-ec",
+              "program_path=$(mktemp -d)\nprintf \"%s\" \"$0\" > \"$program_path/ephemeral_component.py\"\npython3 -m kfp.v2.components.executor_main                         --component_module_path                         \"$program_path/ephemeral_component.py\"                         \"$@\"\n",
+              "\nimport kfp\nfrom kfp.v2 import dsl\nfrom kfp.v2.dsl import *\nfrom typing import *\n\ndef preprocess(\n    dataset_raw:  Input[Dataset],\n    dataset_processed: Output[Dataset],\n    ):\n\n    import pandas as pd\n    from sklearn.preprocessing import StandardScaler\n\n    # This object performs several preprocessing of the data set\n\n    class Preprocessor: \n\n        def __init__(self, df):\n            Preprocessor.data = df.copy()\n            Preprocessor.processed_data = None\n\n        def dropVar(self, vars):\n            # Remove a variable from the dataset\n            self.processed_data = self.data.drop(vars, axis=1)\n\n        def str2int(self, variables):\n            # Define a function that extract the numerical value from a string like '$200' and convert it to a float\n            newdf = self.processed_data.copy()\n            for var in variables:\n                if newdf[var].dtypes == 'object': \n                    # if it was a string, convert variable to float \n                    newdf[var] = newdf[var].apply(lambda x: float(x.split(\"$\")[1].replace(\",\",\"\")) if type(x) == str else x)\n                else: \n                    pass\n            self.processed_data = newdf\n\n\n        def fillMissing(self):  \n            # fill NaN with mean and mode\n            df = self.processed_data.copy()\n            vars = df.columns\n            for var in vars: \n                if any(df[var].isna()):\n                    if df[var].dtypes == 'float64':\n                        # substitute NaN with mean\n                        df[var].fillna(value=df[var].mean(), \n                                            inplace=True)\n                    else:\n                        # substitute NaN with mode\n                        df[var].fillna(value=df[var].mode()[0], \n                                            inplace=True)\n            self.processed_data = df\n\n        def scaling(self, catVars, target):\n            # setup scaler\n            scaler = StandardScaler()\n            df = self.processed_data.copy()\n\n            scaleCols = list(set(df.columns)-set(catVars+[target]))\n            # remove both target variables because in the test data they are not provided\n            # training set scaling\n            df[scaleCols] = scaler.fit_transform(df[scaleCols])        # re-add categorical variables\n            # df = df.join(df[catVars])\n            self.processed_data = df\n\n        def cat2int(self, variables):\n            # Convert categorical variables to numerical\n            # Create a copy of the original dataframe to avoid warnings\n            df = self.processed_data.copy()\n            firstidx = df.index[0]\n            for var in variables:\n                if type(df[var][firstidx]) == str:\n                    df[var] = df[var].apply(lambda x: 1 if 'yes' in x.lower() else 0)\n                    c = 1\n                else:\n                    # if we run the code again it will\n                    pass\n            self.processed_data = df\n\n\n        def convertCategorical(self):\n            catVar = ['PARENT1', 'MSTATUS', 'RED_CAR', 'REVOKED']  \n            # Convert categorical to dummies\n            self.cat2int(catVar)\n\n            df = self.processed_data.copy()\n            # Convert binary to dummies\n            # converting SEX\n            df['GENDER'] = df['SEX'].apply(lambda x: 1 if 'M' in x else 0)\n            df.drop(['SEX'],axis=1,inplace=True)\n\n            # converting CAR_USE, URBANICITY\n            df['COMMERCIAL_CAR_USE'] = df['CAR_USE'].apply(lambda x: 1 if 'commercial' in x.lower() else 0)\n            df.drop(['CAR_USE'],axis=1,inplace=True)\n\n            df['URBAN_CAR'] = df['URBANICITY'].apply(lambda x: 1 if 'urban' in x.lower() else 0)\n            df.drop(['URBANICITY'],axis=1,inplace=True)\n\n            # Convert EDUCATION, JOB, CAR_TYPE\n            df['EDUCATION'] = df['EDUCATION'].apply(lambda x: 'Elementary Education' if '<high school' in x.lower() else x)\n            # Insert dummy variables and Drop the original variable\n            df = df.join(pd.get_dummies(df.EDUCATION.str.upper())).drop(['EDUCATION'],axis=1)\n            df = df.join(pd.get_dummies(df.JOB.str.upper())).drop(['JOB'],axis=1)\n            df = df.join(pd.get_dummies(df.CAR_TYPE.str.upper())).drop(['CAR_TYPE'],axis=1)\n\n            df.columns = df.columns.str.replace(\"Z_\",\"\")\n            df.columns = df.columns.str.replace(\" \",\"_\")\n\n            self.processed_data = df    \n\n\n    def preprocessing(df,train=False):\n        print('\\n'+'*'*10 + 'Preprocessing' + '*'*10)\n        # define a Preprocessor object\n        preprocess = Preprocessor(df)\n\n        # Remove useless columns from the dataframes\n        toDrop = ['TARGET_AMT'] if train else ['TARGET_FLAG','TARGET_AMT']\n        toDrop += ['INDEX']\n        preprocess.dropVar(toDrop)\n        cat2numVars = [\"INCOME\",\"HOME_VAL\",\"BLUEBOOK\",\"OLDCLAIM\"]\n        preprocess.str2int(cat2numVars)\n\n        # return preprocess.processed_data\n\n        catcols = ['PARENT1', 'MSTATUS', 'RED_CAR', 'REVOKED',\n                    'SEX','CAR_USE','URBANICITY','JOB','CAR_TYPE','EDUCATION']\n\n        preprocess.scaling(catcols,target='TARGET_FLAG')\n        preprocess.convertCategorical()\n        preprocess.fillMissing()\n\n\n        return preprocess.processed_data\n\n    df_test = pd.read_csv(dataset_raw.path+\".csv\")\n    df_processed  = preprocessing(df_test,False)\n\n    df_processed.to_csv(dataset_processed.path   + \".csv\" , index=False, encoding='utf-8')\n\n"
+            ],
+            "image": "python:3.7"
+          }
+        },
+        "exec-read-table": {
+          "container": {
+            "args": [
+              "--executor_input",
+              "{{$}}",
+              "--function_to_execute",
+              "read_table"
+            ],
+            "command": [
+              "sh",
+              "-c",
+              "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip || python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1 python3 -m pip install --quiet     --no-warn-script-location 'google-cloud-storage==1.42.2' 'google-cloud-bigquery==2.30.0' 'pandas==1.3.5' 'pyarrow==9.0.0' 'kfp==1.8.18' && \"$0\" \"$@\"\n",
+              "sh",
+              "-ec",
+              "program_path=$(mktemp -d)\nprintf \"%s\" \"$0\" > \"$program_path/ephemeral_component.py\"\npython3 -m kfp.v2.components.executor_main                         --component_module_path                         \"$program_path/ephemeral_component.py\"                         \"$@\"\n",
+              "\nimport kfp\nfrom kfp.v2 import dsl\nfrom kfp.v2.dsl import *\nfrom typing import *\n\ndef read_table(\n    project_id: str,\n    dataset_id: str,\n    table_id: str,\n    dataset: Output[Dataset],\n\n):\n    from google.cloud import bigquery\n    client = bigquery.Client(project = project_id)\n\n    read_query = f\"SELECT * FROM {project_id}.{dataset_id}.{table_id}\"\n    df = client.query(read_query).to_dataframe()\n\n    df.to_csv(dataset.path + \".csv\" , index=False, encoding='utf-8')\n\n"
+            ],
+            "image": "python:3.7"
+          }
+        },
+        "exec-transfer-to-bq": {
+          "container": {
+            "args": [
+              "--executor_input",
+              "{{$}}",
+              "--function_to_execute",
+              "transfer_to_bq"
+            ],
+            "command": [
+              "sh",
+              "-c",
+              "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip || python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1 python3 -m pip install --quiet     --no-warn-script-location 'google-cloud-storage==1.42.2' 'google-cloud-bigquery==2.30.0' 'pandas==1.3.5' 'pyarrow==9.0.0' 'kfp==1.8.18' && \"$0\" \"$@\"\n",
+              "sh",
+              "-ec",
+              "program_path=$(mktemp -d)\nprintf \"%s\" \"$0\" > \"$program_path/ephemeral_component.py\"\npython3 -m kfp.v2.components.executor_main                         --component_module_path                         \"$program_path/ephemeral_component.py\"                         \"$@\"\n",
+              "\nimport kfp\nfrom kfp.v2 import dsl\nfrom kfp.v2.dsl import *\nfrom typing import *\n\ndef transfer_to_bq(\n    uri: str,\n    project: str,\n    dataset: str,\n    table: str    \n):\n\n    from google.cloud import bigquery\n    # Construct a BigQuery client object.\n    client = bigquery.Client(project= project)\n    table_id = f\"{project}.{dataset}.{table}\"\n\n    job_config = bigquery.LoadJobConfig(autodetect=True,\n                                        skip_leading_rows=1,\n                                        source_format=bigquery.SourceFormat.CSV,\n                                    )\n\n    file_name = \"train_auto.csv\"\n    # uri = f\"gs://{bucket_name}/{file_name}\"\n\n    load_job = client.load_table_from_uri(\n        uri, table_id, job_config=job_config\n    )  # Make an API request.\n\n    load_job.result()  # Waits for the job to complete.\n\n    destination_table = client.get_table(table_id)  # Make an API request.\n    print(\"Loaded {} rows.\".format(destination_table.num_rows))\n\n    destination_table\n\n"
+            ],
+            "image": "python:3.7"
+          }
+        }
+      }
+    },
+    "pipelineInfo": {
+      "name": "pipeline-predict-workshop"
+    },
+    "root": {
+      "dag": {
+        "tasks": {
+          "endpoint-predict": {
+            "cachingOptions": {
+              "enableCache": true
+            },
+            "componentRef": {
+              "name": "comp-endpoint-predict"
+            },
+            "dependentTasks": [
+              "preprocess"
+            ],
+            "inputs": {
+              "artifacts": {
+                "input_data": {
+                  "taskOutputArtifact": {
+                    "outputArtifactKey": "dataset_processed",
+                    "producerTask": "preprocess"
+                  }
+                }
+              },
+              "parameters": {
+                "dataset_id": {
+                  "componentInputParameter": "dataset_id"
+                },
+                "endpoint_id": {
+                  "componentInputParameter": "endpoint_id"
+                },
+                "project_id": {
+                  "componentInputParameter": "project_id"
+                },
+                "project_location": {
+                  "componentInputParameter": "project_location"
+                },
+                "table_id": {
+                  "componentInputParameter": "output_table_id"
+                }
+              }
+            },
+            "taskInfo": {
+              "name": "endpoint_predictions"
+            }
+          },
+          "preprocess": {
+            "cachingOptions": {
+              "enableCache": true
+            },
+            "componentRef": {
+              "name": "comp-preprocess"
+            },
+            "dependentTasks": [
+              "read-table"
+            ],
+            "inputs": {
+              "artifacts": {
+                "dataset_raw": {
+                  "taskOutputArtifact": {
+                    "outputArtifactKey": "dataset",
+                    "producerTask": "read-table"
+                  }
+                }
+              }
+            },
+            "taskInfo": {
+              "name": "preprocess"
+            }
+          },
+          "read-table": {
+            "cachingOptions": {
+              "enableCache": true
+            },
+            "componentRef": {
+              "name": "comp-read-table"
+            },
+            "dependentTasks": [
+              "transfer-to-bq"
+            ],
+            "inputs": {
+              "parameters": {
+                "dataset_id": {
+                  "componentInputParameter": "dataset_id"
+                },
+                "project_id": {
+                  "componentInputParameter": "project_id"
+                },
+                "table_id": {
+                  "componentInputParameter": "input_table_id"
+                }
+              }
+            },
+            "taskInfo": {
+              "name": "read-table"
+            }
+          },
+          "transfer-to-bq": {
+            "cachingOptions": {
+              "enableCache": true
+            },
+            "componentRef": {
+              "name": "comp-transfer-to-bq"
+            },
+            "inputs": {
+              "parameters": {
+                "dataset": {
+                  "componentInputParameter": "dataset_id"
+                },
+                "project": {
+                  "componentInputParameter": "project_id"
+                },
+                "table": {
+                  "componentInputParameter": "input_table_id"
+                },
+                "uri": {
+                  "componentInputParameter": "input_uri"
+                }
+              }
+            },
+            "taskInfo": {
+              "name": "transfer-to-bq"
+            }
+          }
+        }
+      },
+      "inputDefinitions": {
+        "parameters": {
+          "dataset_id": {
+            "type": "STRING"
+          },
+          "endpoint_id": {
+            "type": "STRING"
+          },
+          "input_table_id": {
+            "type": "STRING"
+          },
+          "input_uri": {
+            "type": "STRING"
+          },
+          "output_table_id": {
+            "type": "STRING"
+          },
+          "project_id": {
+            "type": "STRING"
+          },
+          "project_location": {
+            "type": "STRING"
+          }
+        }
+      }
+    },
+    "schemaVersion": "2.0.0",
+    "sdkVersion": "kfp-1.8.18"
+  },
+  "runtimeConfig": {
+    "gcsOutputDirectory": "gs://gcp-workshop-vertex-pipeline/pipeline_root",
+    "parameters": {
+      "dataset_id": {
+        "stringValue": "gcp_workshop"
+      },
+      "endpoint_id": {
+        "stringValue": "353928394934583296"
+      },
+      "input_table_id": {
+        "stringValue": "test_raw"
+      },
+      "input_uri": {
+        "stringValue": "gs://gcp-workshop-input/test_auto.csv"
+      },
+      "output_table_id": {
+        "stringValue": "test_predictions"
+      },
+      "project_id": {
+        "stringValue": "sandbox-mvp-001"
+      },
+      "project_location": {
+        "stringValue": "europe-west4"
+      }
+    }
+  }
+}

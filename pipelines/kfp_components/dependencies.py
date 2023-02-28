@@ -21,7 +21,7 @@ SKL_SERVING_CONTAINER_IMAGE_URI = (
 # Google SDK specific
 GOOGLE_CLOUD_BIGQUERY = "google-cloud-bigquery==2.30.0"
 GOOGLE_CLOUD_STORAGE = "google-cloud-storage==1.42.2"
-GOOGLE_CLOUD_AIPLATFORM = "google-cloud-aiplatform==1.10.0"
+GOOGLE_CLOUD_AIPLATFORM = "google-cloud-aiplatform==1.21.0"
 GOOGLE_CLOUD_COMPONENTS= 'google_cloud_pipeline_components==0.2.0'
 
 # TF specific
@@ -35,7 +35,7 @@ SKLEARN = "scikit-learn==0.24.1"
 
 #PANDAS GBQ
 PANDASGBQ = "pandas_gbq==0.19.1"
-PANDAS = "pandas==1.3.2"
+PANDAS = "pandas==1.3.5"
 PYARROW = "pyarrow==9.0.0"
 
 #GCSFS

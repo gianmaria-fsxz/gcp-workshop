@@ -15,7 +15,7 @@ def trigger_pipeline(
     template_path: str,
     pipeline_root: str,
     service_account: str,
-    enable_caching: Optional[bool] = True,
+    enable_caching: Optional[bool] = False,
 ):
     """Trigger the Vertex Pipeline run.
     Args:

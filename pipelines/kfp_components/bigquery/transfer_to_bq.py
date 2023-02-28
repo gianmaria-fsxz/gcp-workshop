@@ -1,6 +1,5 @@
 from kfp.v2.dsl import Output, Dataset, component
 from pipelines.kfp_components.dependencies import PYTHON310, GOOGLE_CLOUD_BIGQUERY, GOOGLE_CLOUD_STORAGE, PANDAS,PYARROW
-from pipelines.kfp_components.variables import TARGET_COL, KEY_COL, BINARY_COLS, INT_COLS, FLOAT_COLS
 
 @component(base_image= PYTHON310, 
            packages_to_install=[GOOGLE_CLOUD_STORAGE, GOOGLE_CLOUD_BIGQUERY, PANDAS, PYARROW])
