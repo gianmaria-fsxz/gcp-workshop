@@ -1,5 +1,5 @@
 ==================================
-Devicecycle - Modeling
+GCP - Workshop - Vertex Pipeline
 ==================================
 
 launch step
